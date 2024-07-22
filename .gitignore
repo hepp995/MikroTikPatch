@@ -1,6 +1,5 @@
 __pycache__/
+.vscode/
 venv/
-keygen/
 app/
 test_*.py
-mikrotik*
