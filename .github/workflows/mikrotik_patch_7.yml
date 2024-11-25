@@ -86,6 +86,7 @@ jobs:
           ARCH='-arm64'
           echo "ARCH=$ARCH" >> $GITHUB_ENV
         fi
+        sudo apt-get update > /dev/null
 
     - name: Cache Squashfs
       if: steps.get_latest.outputs.has_new_version == 'true'
@@ -120,12 +121,12 @@ jobs:
         sudo mksquashfs option-root option.sfs -quiet -comp xz -no-xattrs -b 256k
         sudo rm -rf option-root
         if [ "${{ matrix.arch }}" == "x86" ]; then
-          sudo wget -O cpython-3.11.9.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20240713/cpython-3.11.9+20240713-x86_64-unknown-linux-gnu-install_only.tar.gz
+          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-musl-install_only_stripped.tar.gz
         elif [ "${{ matrix.arch }}" == "arm64" ]; then
-          sudo wget -O cpython-3.11.9.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20240713/cpython-3.11.9+20240713-aarch64-unknown-linux-gnu-install_only.tar.gz
+          sudo wget -O cpython.tar.gz -nv https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz
         fi
-        sudo tar -xf cpython-3.11.9.tar.gz
-        sudo rm cpython-3.11.9.tar.gz
+        sudo tar -xf cpython.tar.gz
+        sudo rm cpython.tar.gz
         sudo rm -rf ./python/include
         sudo rm -rf ./python/share
         sudo mksquashfs python python3.sfs -quiet -comp xz -no-xattrs -b 256k
@@ -378,14 +379,16 @@ jobs:
     - name: Upload Files
       if: steps.get_latest.outputs.has_new_version == 'true'
       run: |
-        mkdir -p ./publish/$LATEST_VERSION
-        echo $LATEST_VERSION $BUILD_TIME > ./publish/NEWESTa7.${{ matrix.channel }}
-        cp CHANGELOG ./publish/$LATEST_VERSION/
-        cp ./all_packages/*.npk ./publish/$LATEST_VERSION/
+        sudo mkdir -p ./publish/$LATEST_VERSION
+        echo $LATEST_VERSION $BUILD_TIME | sudo tee ./publish/NEWESTa7.${{ matrix.channel }}
+        sudo cp CHANGELOG ./publish/$LATEST_VERSION/
+        sudo cp ./all_packages/*.npk ./publish/$LATEST_VERSION/
+        sudo chown -R root:root ./publish/
         sudo apt-get install -y lftp > /dev/null 2>&1
         sudo -E lftp -u ${{ secrets.SSH_USERNAME }},'${{ secrets.SSH_PASSWORD }}' sftp://${{ secrets.SSH_SERVER }}:${{ secrets.SSH_PORT }} <<EOF
         set sftp:auto-confirm yes
         mirror --reverse --verbose --only-newer ./publish ${{ secrets.SSH_DIRECTORY }}
+        chown -R 32768:32768 ${{ secrets.SSH_DIRECTORY }}
         bye
         EOF
 
@@ -428,6 +431,5 @@ jobs:
           netinstall-${{ env.LATEST_VERSION }}.*
           install-image-${{ env.LATEST_VERSION }}.zip
           routeros-${{ env.LATEST_VERSION }}${{ env.ARCH }}.npk
-          option-${{ env.LATEST_VERSION }}${{ env.ARCH }}.npk
           all_packages-*-${{ env.LATEST_VERSION }}.zip
-          *.EFI
+
